@@ -33,6 +33,21 @@ def get_cuda_home_path():
         nvrtc = list(nvrtc)
         return torch_lib_path if len(nvrtc) > 0 else None
 
+def get_cuda_ver_from_torch():
+    # Authoritative: works for pip-wheel CUDA (nvidia/cuXX/lib), where torch/lib has no nvrtc
+    try:
+        import torch
+    except ImportError:
+        return None
+    if not torch.version.cuda:
+        return None
+    major, minor = torch.version.cuda.split('.')[:2]
+    if major == '10':
+        return '102'
+    if major == '11':
+        return '110' if minor == '0' else '111' if minor == '1' else '11x'
+    return f'{major}x'
+
 def install_cupy():
     cuda_home = get_cuda_home_path()
     try:
@@ -43,11 +58,12 @@ def install_cupy():
         print("CuPy is already installed.")
     except:
         print("Uninstall cupy if existed...")
-        os.system(f'"{sys.executable}" {s_param} -m pip uninstall -y cupy-wheel cupy-cuda102 cupy-cuda110 cupy-cuda111 cupy-cuda11x cupy-cuda12x')
+        os.system(f'"{sys.executable}" {s_param} -m pip uninstall -y cupy-wheel cupy-cuda102 cupy-cuda110 cupy-cuda111 cupy-cuda11x cupy-cuda12x cupy-cuda13x')
         print("Installing cupy...")
-        cuda_ver = get_cuda_ver_from_dir(cuda_home)
+        cuda_ver = get_cuda_ver_from_torch() or (get_cuda_ver_from_dir(cuda_home) if cuda_home else None)
         cupy_package = f"cupy-cuda{cuda_ver}" if cuda_ver is not None else "cupy-wheel"
-        os.system(f'"{sys.executable}" {s_param} -m pip install {cupy_package}')
+        if os.system(f'"{sys.executable}" {s_param} -m pip install {cupy_package}') != 0:
+            sys.exit(f"Failed to install {cupy_package}")
 
 with open(Path(__file__).parent / "requirements-no-cupy.txt", 'r') as f:
     for package in f.readlines():
